@@ -2,13 +2,11 @@ package instagram
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"instagram-user-processor/pkg/database"
 	"instagram-user-processor/pkg/external"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"

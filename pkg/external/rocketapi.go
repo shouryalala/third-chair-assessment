@@ -2,6 +2,7 @@ package external
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -153,6 +154,9 @@ func ScrapeInstagramUser(ctx context.Context, username string) (*database.User, 
 
 	operation := func() (*RocketAPIResponse, []byte, error) {
 		// Respect rate limit
+		if rateLimiter == nil {
+			return nil, nil, fmt.Errorf("rate limiter not initialized - call InitRocketAPI() first")
+		}
 		if err := rateLimiter.Wait(ctx); err != nil {
 			return nil, nil, fmt.Errorf("rate limit wait failed: %w", err)
 		}
@@ -223,13 +227,13 @@ func ScrapeInstagramUser(ctx context.Context, username string) (*database.User, 
 	user := &database.User{
 		ID:                    userResp.User.ID,
 		Username:              userResp.User.Username,
-		FullName:              userResp.User.FullName,
-		Biography:             userResp.User.Biography,
+		FullName:              sql.NullString{String: userResp.User.FullName, Valid: userResp.User.FullName != ""},
+		Biography:             sql.NullString{String: userResp.User.Biography, Valid: userResp.User.Biography != ""},
 		IsVerified:            userResp.User.IsVerified,
 		IsBusinessAccount:     userResp.User.IsBusinessAccount,
 		IsProfessionalAccount: userResp.User.IsProfessionalAccount,
 		IsPrivate:             userResp.User.IsPrivate,
-		CategoryName:          userResp.User.CategoryName,
+		CategoryName:          sql.NullString{String: userResp.User.CategoryName, Valid: userResp.User.CategoryName != ""},
 		Followers:             userResp.User.EdgeFollowedBy.Count,
 		Following:             userResp.User.EdgeFollow.Count,
 		Posts:                 userResp.User.EdgeOwnerToTimelineMedia.Count,

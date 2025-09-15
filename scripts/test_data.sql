@@ -16,7 +16,7 @@ INSERT INTO instagram_users (id, username, full_name, biography, is_verified, is
 -- Insert sample posts for these users
 INSERT INTO instagram_posts (id, user_id, username, caption, like_count, comment_count, play_count, is_ad, posted_at) VALUES
 -- Posts for musiclover2024
-('post_1001_1', '1001', 'musiclover2024', 'New track dropping this Friday! Can\'t wait to share it with you all 🎵', 4500, 234, 12000, false, NOW() - INTERVAL '1 day'),
+('post_1001_1', '1001', 'musiclover2024', 'New track dropping this Friday! Can''t wait to share it with you all 🎵', 4500, 234, 12000, false, NOW() - INTERVAL '1 day'),
 ('post_1001_2', '1001', 'musiclover2024', 'Studio session vibes ✨ #NewMusic #Producer', 3200, 156, 8900, false, NOW() - INTERVAL '3 days'),
 ('post_1001_3', '1001', 'musiclover2024', 'Thanks to @soundgear for the amazing equipment! #ad #sponsored', 2800, 89, 5600, true, NOW() - INTERVAL '5 days'),
 
@@ -42,7 +42,7 @@ INSERT INTO instagram_posts (id, user_id, username, caption, like_count, comment
 ('post_1006_2', '1006', 'travel_emma', 'Travel gear essentials - link in bio 📸', 3400, 167, null, false, NOW() - INTERVAL '5 days'),
 
 -- Posts for comedian_joe
-('post_1007_1', '1007', 'comedian_joe', 'When you realize it\'s Monday tomorrow 😂', 890, 123, 12000, false, NOW() - INTERVAL '1 day'),
+('post_1007_1', '1007', 'comedian_joe', 'When you realize it''s Monday tomorrow 😂', 890, 123, 12000, false, NOW() - INTERVAL '1 day'),
 ('post_1007_2', '1007', 'comedian_joe', 'Show tonight at 8 PM! Come laugh with us 🎭', 654, 45, null, false, NOW() - INTERVAL '3 days'),
 
 -- Posts for fashion_lisa
@@ -55,7 +55,7 @@ INSERT INTO instagram_posts (id, user_id, username, caption, like_count, comment
 ('post_1009_2', '1009', 'gamer_alex', 'New gaming setup reveal! Specs in comments 💻', 890, 67, 23000, false, NOW() - INTERVAL '5 days'),
 
 -- Posts for chef_maria
-('post_1010_1', '1010', 'chef_maria', 'Tonight\'s special: Pan-seared salmon with truffle risotto 🍽️', 2300, 134, null, false, NOW() - INTERVAL '1 day'),
+('post_1010_1', '1010', 'chef_maria', 'Tonight''s special: Pan-seared salmon with truffle risotto 🍽️', 2300, 134, null, false, NOW() - INTERVAL '1 day'),
 ('post_1010_2', '1010', 'chef_maria', 'Behind the scenes at @finedining kitchen 👩‍🍳', 1800, 98, 15000, false, NOW() - INTERVAL '3 days');
 
 -- Insert sample assets (for complex query testing)
@@ -63,7 +63,7 @@ INSERT INTO instagram_assets (id, post_id, asset_type, url, tagged_user_username
 ('asset_1', 'post_1001_1', 'video', 'https://example.com/video1.mp4', ARRAY['techguru_sarah', 'artist_david']),
 ('asset_2', 'post_1003_1', 'image', 'https://example.com/image1.jpg', ARRAY['chef_maria']),
 ('asset_3', 'post_1004_1', 'video', 'https://example.com/video2.mp4', ARRAY['travel_emma', 'fashion_lisa']),
-('asset_4', 'post_1006_1', 'image', 'https://example.com/image2.jpg', ARRAY[]),
+('asset_4', 'post_1006_1', 'image', 'https://example.com/image2.jpg', ARRAY[]::text[]),
 ('asset_5', 'post_1008_1', 'carousel', 'https://example.com/carousel1/', ARRAY['foodie_adventures', 'fitness_jenny']);
 
 -- Insert a sample processing job

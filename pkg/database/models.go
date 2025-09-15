@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"encoding/json"
 	"time"
 )
@@ -9,13 +10,13 @@ import (
 type User struct {
 	ID                    string    `json:"id" db:"id"`
 	Username              string    `json:"username" db:"username"`
-	FullName              string    `json:"full_name" db:"full_name"`
-	Biography             string    `json:"biography" db:"biography"`
+	FullName              sql.NullString `json:"full_name" db:"full_name"`
+	Biography             sql.NullString `json:"biography" db:"biography"`
 	IsVerified            bool      `json:"is_verified" db:"is_verified"`
 	IsBusinessAccount     bool      `json:"is_business_account" db:"is_business_account"`
 	IsProfessionalAccount bool      `json:"is_professional_account" db:"is_professional_account"`
 	IsPrivate             bool      `json:"is_private" db:"is_private"`
-	CategoryName          string    `json:"category_name" db:"category_name"`
+	CategoryName          sql.NullString `json:"category_name" db:"category_name"`
 	Followers             int64     `json:"followers" db:"followers"`
 	Following             int64     `json:"following" db:"following"`
 	Posts                 int64     `json:"posts" db:"posts"`
@@ -41,7 +42,7 @@ type Post struct {
 	ID          string    `json:"id" db:"id"`
 	UserID      string    `json:"user_id" db:"user_id"`
 	Username    string    `json:"username" db:"username"`
-	Caption     string    `json:"caption" db:"caption"`
+	Caption     sql.NullString `json:"caption" db:"caption"`
 	LikeCount   int64     `json:"like_count" db:"like_count"`
 	CommentCount int64    `json:"comment_count" db:"comment_count"`
 	PlayCount   *int64    `json:"play_count,omitempty" db:"play_count"`

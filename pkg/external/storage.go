@@ -64,7 +64,7 @@ func (m *MockStorageClient) GetUploadURL(userID string) string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if imageURL, exists := m.uploads[userID]; exists {
+	if _, exists := m.uploads[userID]; exists {
 		return fmt.Sprintf("https://mock-s3-bucket.s3.amazonaws.com/profile-pics/%s.jpg", userID)
 	}
 

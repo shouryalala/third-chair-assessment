@@ -1,14 +1,13 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"instagram-user-processor/pkg/api"
 	"instagram-user-processor/pkg/database"
+	"instagram-user-processor/pkg/external"
 	"instagram-user-processor/pkg/utils"
 
 	"github.com/gin-gonic/gin"
@@ -32,6 +31,9 @@ func main() {
 	if err := database.Initialize(config.DatabaseURL); err != nil {
 		log.Fatal().Err(err).Msg("failed to initialize database")
 	}
+
+	// Initialize RocketAPI client
+	external.InitRocketAPI()
 
 	// Set Gin mode
 	if config.Environment == "production" {
