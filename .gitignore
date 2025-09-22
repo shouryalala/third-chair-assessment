@@ -1,0 +1,71 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+
+# Dependency directories
+vendor/
+
+# Go build cache
+bin/
+dist/
+
+# IDE specific files
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+*.code-workspace
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Documentation notes
+CLAUDE.md
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db
+
+# Coverage reports
+coverage.txt
+coverage.html
+
+# Air live reload
+.air.toml
+tmp/
+
+# Binary executables
+instagram-user-processor
+server
+main
+
+SOLUTION.md

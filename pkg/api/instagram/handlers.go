@@ -34,6 +34,7 @@ func GetUserHandler(c *gin.Context) {
 		return
 	}
 
+	source := "database"
 	// If user not found in database, scrape from RocketAPI
 	if errors.Is(err, sql.ErrNoRows) {
 		log.Info().Str("username", username).Msg("user not found in database, scraping from RocketAPI")
@@ -53,6 +54,7 @@ func GetUserHandler(c *gin.Context) {
 		}
 
 		user = scrapedUser
+		source = "rocketapi"
 	}
 
 	// Get detailed stats
@@ -67,7 +69,7 @@ func GetUserHandler(c *gin.Context) {
 		Stats: stats,
 		Meta: ResponseMeta{
 			ProcessedAt: time.Now(),
-			Source:      "database",
+			Source:      source,
 		},
 	}
 

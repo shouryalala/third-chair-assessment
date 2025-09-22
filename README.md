@@ -4,7 +4,7 @@
 
 ## 🎯 Assignment Overview
 
-This is a self-contained Go application that processes Instagram user data using RocketAPI. The application currently supports single user processing, and **your task is to implement parallel batch processing capabilities**.
+This is a Go application that processes Instagram user data using RocketAPI. The application currently supports single user processing, and **your task is to implement parallel batch processing capabilities**.
 
 ### Current Functionality
 - ✅ Single user Instagram data fetching
@@ -19,32 +19,60 @@ This is a self-contained Go application that processes Instagram user data using
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Go 1.23+
-- Docker & Docker Compose
-- RocketAPI key from https://rocketapi.io
+- **Go 1.20+** (or any recent version)
+- **PostgreSQL** (any recent version 12+)
+- **RocketAPI key** from https://rocketapi.io
 
-### Setup
-1. **Clone and setup the environment:**
+### Setup Instructions
+
+1. **Clone the repository and install dependencies:**
    ```bash
-   ./scripts/setup.sh
+   git clone <repository-url>
+   cd instagram-user-processor
+   go mod download
    ```
 
-2. **Add your RocketAPI key to `.env`:**
+2. **Set up PostgreSQL database:**
    ```bash
-   # Edit .env file
-   ROCKETAPI_KEY=your_actual_key_here
+   # Create the database
+   createdb instagram_processor
+
+   # Initialize the schema
+   psql -d instagram_processor -f init.sql
+
+   # (Optional) Load sample data
+   psql -d instagram_processor -f scripts/test_data.sql
    ```
 
-3. **Start the application:**
+3. **Configure environment variables:**
+   ```bash
+   # Copy the example configuration
+   cp .env.example .env
+
+   # Edit .env and update:
+   # 1. ROCKETAPI_KEY - Get from https://rocketapi.io
+   # 2. DATABASE_URL - Your PostgreSQL connection string
+   ```
+
+4. **Run the application:**
    ```bash
    go run cmd/server/main.go
    ```
 
-4. **Verify setup:**
+5. **Verify setup:**
    ```bash
+   # Check health endpoint
    curl http://localhost:8080/health
+
+   # Test single user endpoint
    curl http://localhost:8080/api/v1/instagram/user/musiclover2024
    ```
+
+### Alternative: Use the setup script
+```bash
+# Run the automated setup
+./scripts/setup.sh
+```
 
 ## 📋 API Endpoints
 
@@ -120,7 +148,7 @@ You need to implement parallel processing that:
 │   └── utils/           # Utilities and helpers
 ├── scripts/             # Setup and utility scripts
 ├── init.sql             # Database schema
-└── docker-compose.yml   # Local development setup
+└── .env.example         # Configuration template
 ```
 
 ### Key Components
@@ -205,44 +233,47 @@ curl -X POST http://localhost:8080/api/v1/instagram/users/batch \
 
 ## 🛠️ Development Tools
 
-**Database Admin:** http://localhost:8081 (adminer)
-- Server: `postgres`
-- Username: `user`
-- Password: `password`
-- Database: `instagram_processor`
+**PostgreSQL Admin:**
+- Use any PostgreSQL client (pgAdmin, TablePlus, DBeaver, etc.)
+- Or use psql command line:
+  ```bash
+  psql -d instagram_processor
+  ```
 
 **Health Check:** http://localhost:8080/health
 
-**Sample Data:** Pre-populated with 15 test users and posts
+**Sample Data:** Pre-populated with 15 test users and posts (if you loaded test_data.sql)
 
-## 🐛 Common Issues
+## 🐛 Troubleshooting
 
-**Database Connection:**
+### Database Connection Issues
 ```bash
-# Check if PostgreSQL is running
-docker-compose ps postgres
+# Check PostgreSQL is running
+pg_isready
 
-# View logs
-docker-compose logs postgres
+# Test connection
+psql -d instagram_processor -c "SELECT 1"
+
+# Check your connection string in .env
+grep DATABASE_URL .env
 ```
 
-**RocketAPI Issues:**
+### RocketAPI Issues
 ```bash
-# Check your API key in .env
+# Verify your API key is set
 grep ROCKETAPI_KEY .env
 
-# Monitor API calls
-tail -f logs/app.log | grep "RocketAPI"
+# Monitor application logs
+go run cmd/server/main.go 2>&1 | grep -i error
 ```
 
-**Port Conflicts:**
+### Port Conflicts
 ```bash
-# Check what's using port 8080
+# Check if port 8080 is available
 lsof -i :8080
 
-# Use different port
-export PORT=8081
-go run cmd/server/main.go
+# Use a different port
+PORT=8081 go run cmd/server/main.go
 ```
 
 ## 📝 Implementation Notes
@@ -250,7 +281,7 @@ go run cmd/server/main.go
 ### Worker Pool Pattern
 ```go
 // Example pattern for your implementation
-pool := queue.NewRateLimitedWorkerPool(req.MaxConcurrency, rateLimiter)
+pool := queue.NewRateLimitedWorkerPool(opts, 10) // 10 req/sec
 
 for _, username := range req.Usernames {
     pool.Submit(func() error {
