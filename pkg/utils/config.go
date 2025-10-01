@@ -14,8 +14,8 @@ type Config struct {
 	ServerPort     string
 	DatabaseURL    string
 	RocketAPIKey   string
-	RateLimit      int  // requests per second
-	MaxConcurrency int  // max concurrent workers
+	RateLimit      int // requests per second
+	MaxConcurrency int // max concurrent workers
 	LogLevel       string
 }
 
@@ -24,8 +24,8 @@ func LoadConfig() *Config {
 	config := &Config{
 		Environment:    getEnvWithDefault("ENVIRONMENT", "development"),
 		ServerPort:     getEnvWithDefault("PORT", "8080"),
-		DatabaseURL:    getEnvWithDefault("DATABASE_URL", "postgres://user:password@localhost:5432/instagram_processor?sslmode=disable"),
-		RocketAPIKey:   getEnvWithDefault("ROCKETAPI_KEY", "demo_key_123"),
+		DatabaseURL:    getEnvWithDefault("DATABASE_URL", "postgres://postgres:postgres@localhost:5433/instagram_processor?sslmode=disable"),
+		RocketAPIKey:   getEnvWithDefault("ROCKETAPI_KEY", "YDFXjYs088jqjKfTVhxcQA"),
 		RateLimit:      getEnvIntWithDefault("RATE_LIMIT", 10),
 		MaxConcurrency: getEnvIntWithDefault("MAX_CONCURRENCY", 5),
 		LogLevel:       getEnvWithDefault("LOG_LEVEL", "info"),

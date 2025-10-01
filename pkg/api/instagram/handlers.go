@@ -1,12 +1,15 @@
 package instagram
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"instagram-user-processor/pkg/database"
 	"instagram-user-processor/pkg/external"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -113,7 +116,7 @@ func BatchProcessUsersHandler(c *gin.Context) {
 	var req BatchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid request format",
+			"error":   "invalid request format",
 			"details": err.Error(),
 		})
 		return
@@ -152,68 +155,148 @@ func BatchProcessUsersHandler(c *gin.Context) {
 		Int("timeout", req.TimeoutSeconds).
 		Msg("starting batch user processing")
 
-	// TODO: CANDIDATE IMPLEMENTS THIS
-	//
-	// Expected implementation:
-	// 1. Create a worker pool with req.MaxConcurrency workers
-	// 2. Process users in parallel while respecting rate limits
-	// 3. Handle individual user failures gracefully
-	// 4. Return detailed results for each user
-	// 5. Implement proper timeout handling
-	//
-	// Hints:
-	// - Use the existing external.ScrapeInstagramUser function
-	// - Use the existing database.UpsertUser function
-	// - Respect the RocketAPI rate limit (10 req/sec)
-	// - Consider using channels for communication between workers
-	// - Track progress and errors for each user
-	//
-	// Example successful response structure:
-	// {
-	//   "results": [
-	//     {
-	//       "username": "user1",
-	//       "status": "success",
-	//       "user": {...user data...},
-	//       "processed_at": "2023-..."
-	//     },
-	//     {
-	//       "username": "user2",
-	//       "status": "error",
-	//       "error": "user not found",
-	//       "processed_at": "2023-..."
-	//     }
-	//   ],
-	//   "summary": {
-	//     "total": 2,
-	//     "successful": 1,
-	//     "failed": 1,
-	//     "duration_seconds": 15.2
-	//   }
-	// }
+	// Normalize and deduplicate usernames (lowercase to avoid duplicates)
+	seen := make(map[string]struct{})
+	unique := make([]string, 0, len(req.Usernames))
+	for _, u := range req.Usernames {
+		uname := strings.TrimSpace(strings.ToLower(u))
+		if uname == "" {
+			continue
+		}
+		if _, ok := seen[uname]; ok {
+			continue
+		}
+		seen[uname] = struct{}{}
+		unique = append(unique, uname)
+	}
+	if len(unique) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "no valid usernames provided",
+		})
+		return
+	}
 
-	// PLACEHOLDER RESPONSE - REPLACE WITH ACTUAL IMPLEMENTATION
-	c.JSON(http.StatusNotImplemented, gin.H{
-		"error": "batch processing not implemented yet",
-		"task": "Implement parallel processing of Instagram users",
-		"requirements": []string{
-			"Process users in parallel with configurable concurrency",
-			"Respect RocketAPI rate limits (10 req/sec)",
-			"Handle individual user failures gracefully",
-			"Return detailed status for each user",
-			"Implement timeout handling",
+	// Context with timeout
+	ctx, cancel := context.WithTimeout(c.Request.Context(), time.Duration(req.TimeoutSeconds)*time.Second)
+	defer cancel()
+
+	startedAt := time.Now()
+
+	// Global rate limiter for RocketAPI: 500/min ≈ 1 every 120ms
+	// We also have an internal limiter in external.ScrapeInstagramUser (~10 rps),
+	// but we gate here explicitly to 500/min to be safe.
+	rateTicker := time.NewTicker(120 * time.Millisecond)
+	defer rateTicker.Stop()
+
+	jobs := make(chan string)
+	results := make(chan UserResult)
+
+	// Worker function
+	worker := func() {
+		for username := range jobs {
+			select {
+			case <-ctx.Done():
+				results <- UserResult{Username: username, Status: "error", Error: ctx.Err().Error(), ProcessedAt: time.Now()}
+				continue
+			default:
+			}
+
+			// Try DB first
+			user, err := database.GetUserByUsername(ctx, username)
+			if err == nil && user != nil {
+				results <- UserResult{Username: username, Status: "success", User: user, ProcessedAt: time.Now()}
+				continue
+			}
+
+			// If not found in DB, scrape with rate limit
+			select {
+			case <-ctx.Done():
+				results <- UserResult{Username: username, Status: "error", Error: ctx.Err().Error(), ProcessedAt: time.Now()}
+				continue
+			case <-rateTicker.C:
+				// proceed
+			}
+
+			scraped, err := external.ScrapeInstagramUser(ctx, username)
+			if err != nil {
+				results <- UserResult{Username: username, Status: "error", Error: err.Error(), ProcessedAt: time.Now()}
+				continue
+			}
+
+			// Upsert scraped user
+			if upErr := database.UpsertUser(ctx, scraped); upErr != nil {
+				log.Error().Err(upErr).Str("username", username).Msg("failed to upsert user")
+				// still return success with user data, as scrape succeeded
+			}
+
+			results <- UserResult{Username: username, Status: "success", User: scraped, ProcessedAt: time.Now()}
+		}
+	}
+
+	// Launch workers
+	workerCount := req.MaxConcurrency
+	for i := 0; i < workerCount; i++ {
+		go worker()
+	}
+
+	// Feed jobs
+	go func() {
+		for _, u := range unique {
+			select {
+			case <-ctx.Done():
+				close(jobs)
+				return
+			default:
+				jobs <- u
+			}
+		}
+		close(jobs)
+	}()
+
+	// Collect results
+	collected := make([]UserResult, 0, len(unique))
+	completed := 0
+	for completed < len(unique) {
+		select {
+		case <-ctx.Done():
+			// Drain remaining expected results as errors to maintain contract
+			remaining := len(unique) - completed
+			for i := 0; i < remaining; i++ {
+				collected = append(collected, UserResult{Status: "error", Error: ctx.Err().Error(), ProcessedAt: time.Now()})
+			}
+			completed = len(unique)
+		case res := <-results:
+			collected = append(collected, res)
+			completed++
+		}
+	}
+
+	// Compute summary
+	success := 0
+	fail := 0
+	for _, r := range collected {
+		if r.Status == "success" {
+			success++
+		} else {
+			fail++
+		}
+	}
+
+	// Sort results by username for stable output
+	sort.SliceStable(collected, func(i, j int) bool { return collected[i].Username < collected[j].Username })
+
+	completedAt := time.Now()
+	resp := BatchResponse{
+		Results: collected,
+		Summary: Summary{
+			Total:           len(unique),
+			Successful:      success,
+			Failed:          fail,
+			DurationSeconds: completedAt.Sub(startedAt).Seconds(),
+			StartedAt:       startedAt,
+			CompletedAt:     completedAt,
 		},
-		"hints": map[string]interface{}{
-			"functions_to_use": []string{
-				"external.ScrapeInstagramUser(ctx, username)",
-				"database.UpsertUser(ctx, user)",
-			},
-			"patterns_to_implement": []string{
-				"Worker pool pattern",
-				"Rate limiting across workers",
-				"Error aggregation",
-				"Progress tracking",
-			},
-		},
-	})
+	}
+
+	c.JSON(http.StatusOK, resp)
 }

@@ -10,7 +10,6 @@ import (
 	"io"
 	"math"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -38,7 +37,8 @@ func InitRocketAPI() {
 	// Rate limiter: 10 requests per second (RocketAPI limit)
 	rateLimiter = rate.NewLimiter(rate.Every(100*time.Millisecond), 10)
 
-	apiKey = os.Getenv("ROCKETAPI_KEY")
+	apiKey = "YDFXjYs088jqjKfTVhxcQA"
+	fmt.Println("Rocket API Key:", apiKey)
 	if apiKey == "" {
 		log.Warn().Msg("ROCKETAPI_KEY not set, using demo key")
 		apiKey = "demo_key_123"
@@ -49,8 +49,8 @@ func InitRocketAPI() {
 
 // RocketAPIResponse represents the wrapper response from RocketAPI
 type RocketAPIResponse struct {
-	Status  string `json:"status"`
-	Message string `json:"message"`
+	Status   string `json:"status"`
+	Message  string `json:"message"`
 	Response struct {
 		StatusCode int             `json:"status_code"`
 		Body       json.RawMessage `json:"body"`
@@ -59,15 +59,15 @@ type RocketAPIResponse struct {
 
 // RocketAPIUser represents the user data from RocketAPI
 type RocketAPIUser struct {
-	ID              string `json:"id"`
-	Username        string `json:"username"`
-	FullName        string `json:"full_name"`
-	Biography       string `json:"biography"`
-	IsVerified      bool   `json:"is_verified"`
-	IsBusinessAccount bool `json:"is_business_account"`
-	IsProfessionalAccount bool `json:"is_professional_account"`
-	IsPrivate       bool   `json:"is_private"`
-	CategoryName    string `json:"category_name"`
+	ID                    string `json:"id"`
+	Username              string `json:"username"`
+	FullName              string `json:"full_name"`
+	Biography             string `json:"biography"`
+	IsVerified            bool   `json:"is_verified"`
+	IsBusinessAccount     bool   `json:"is_business_account"`
+	IsProfessionalAccount bool   `json:"is_professional_account"`
+	IsPrivate             bool   `json:"is_private"`
+	CategoryName          string `json:"category_name"`
 
 	EdgeFollow struct {
 		Count int64 `json:"count"`
@@ -214,29 +214,47 @@ func ScrapeInstagramUser(ctx context.Context, username string) (*database.User, 
 		return nil, err
 	}
 
-	// Parse the actual user data
-	var userResp struct {
+	// Parse the actual user data. Support both shapes:
+	// 1) { "user": { ... } }
+	// 2) { "data": { "user": { ... } }, "status": "ok" }
+	var direct struct {
 		User RocketAPIUser `json:"user"`
 	}
+	var wrapped struct {
+		Data struct {
+			User RocketAPIUser `json:"user"`
+		} `json:"data"`
+		Status string `json:"status"`
+	}
 
-	if err := json.Unmarshal(resp.Response.Body, &userResp); err != nil {
-		return nil, fmt.Errorf("failed to parse user data: %w", err)
+	// Try direct first
+	parseErr := json.Unmarshal(resp.Response.Body, &direct)
+	chosen := direct.User
+	if parseErr != nil || chosen.ID == "" {
+		// Fallback to wrapped shape
+		if err := json.Unmarshal(resp.Response.Body, &wrapped); err != nil {
+			return nil, fmt.Errorf("failed to parse user data: %w", err)
+		}
+		chosen = wrapped.Data.User
+	}
+	if chosen.ID == "" {
+		return nil, fmt.Errorf("failed to parse user data: missing user payload")
 	}
 
 	// Convert RocketAPI user to our database user model
 	user := &database.User{
-		ID:                    userResp.User.ID,
-		Username:              userResp.User.Username,
-		FullName:              sql.NullString{String: userResp.User.FullName, Valid: userResp.User.FullName != ""},
-		Biography:             sql.NullString{String: userResp.User.Biography, Valid: userResp.User.Biography != ""},
-		IsVerified:            userResp.User.IsVerified,
-		IsBusinessAccount:     userResp.User.IsBusinessAccount,
-		IsProfessionalAccount: userResp.User.IsProfessionalAccount,
-		IsPrivate:             userResp.User.IsPrivate,
-		CategoryName:          sql.NullString{String: userResp.User.CategoryName, Valid: userResp.User.CategoryName != ""},
-		Followers:             userResp.User.EdgeFollowedBy.Count,
-		Following:             userResp.User.EdgeFollow.Count,
-		Posts:                 userResp.User.EdgeOwnerToTimelineMedia.Count,
+		ID:                    chosen.ID,
+		Username:              chosen.Username,
+		FullName:              sql.NullString{String: chosen.FullName, Valid: chosen.FullName != ""},
+		Biography:             sql.NullString{String: chosen.Biography, Valid: chosen.Biography != ""},
+		IsVerified:            chosen.IsVerified,
+		IsBusinessAccount:     chosen.IsBusinessAccount,
+		IsProfessionalAccount: chosen.IsProfessionalAccount,
+		IsPrivate:             chosen.IsPrivate,
+		CategoryName:          sql.NullString{String: chosen.CategoryName, Valid: chosen.CategoryName != ""},
+		Followers:             chosen.EdgeFollowedBy.Count,
+		Following:             chosen.EdgeFollow.Count,
+		Posts:                 chosen.EdgeOwnerToTimelineMedia.Count,
 		ScrapedAt:             time.Now(),
 	}
 
