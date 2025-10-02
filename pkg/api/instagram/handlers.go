@@ -113,7 +113,7 @@ func BatchProcessUsersHandler(c *gin.Context) {
 	var req BatchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid request format",
+			"error":   "invalid request format",
 			"details": err.Error(),
 		})
 		return
@@ -153,49 +153,11 @@ func BatchProcessUsersHandler(c *gin.Context) {
 		Msg("starting batch user processing")
 
 	// TODO: CANDIDATE IMPLEMENTS THIS
-	//
-	// Expected implementation:
-	// 1. Create a worker pool with req.MaxConcurrency workers
-	// 2. Process users in parallel while respecting rate limits
-	// 3. Handle individual user failures gracefully
-	// 4. Return detailed results for each user
-	// 5. Implement proper timeout handling
-	//
-	// Hints:
-	// - Use the existing external.ScrapeInstagramUser function
-	// - Use the existing database.UpsertUser function
-	// - Respect the RocketAPI rate limit (10 req/sec)
-	// - Consider using channels for communication between workers
-	// - Track progress and errors for each user
-	//
-	// Example successful response structure:
-	// {
-	//   "results": [
-	//     {
-	//       "username": "user1",
-	//       "status": "success",
-	//       "user": {...user data...},
-	//       "processed_at": "2023-..."
-	//     },
-	//     {
-	//       "username": "user2",
-	//       "status": "error",
-	//       "error": "user not found",
-	//       "processed_at": "2023-..."
-	//     }
-	//   ],
-	//   "summary": {
-	//     "total": 2,
-	//     "successful": 1,
-	//     "failed": 1,
-	//     "duration_seconds": 15.2
-	//   }
-	// }
 
 	// PLACEHOLDER RESPONSE - REPLACE WITH ACTUAL IMPLEMENTATION
 	c.JSON(http.StatusNotImplemented, gin.H{
 		"error": "batch processing not implemented yet",
-		"task": "Implement parallel processing of Instagram users",
+		"task":  "Implement parallel processing of Instagram users",
 		"requirements": []string{
 			"Process users in parallel with configurable concurrency",
 			"Respect RocketAPI rate limits (10 req/sec)",
