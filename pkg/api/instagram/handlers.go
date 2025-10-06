@@ -1,15 +1,20 @@
 package instagram
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"instagram-user-processor/pkg/database"
 	"instagram-user-processor/pkg/external"
+	"instagram-user-processor/pkg/queue"
 	"net/http"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
@@ -154,28 +159,104 @@ func BatchProcessUsersHandler(c *gin.Context) {
 
 	// TODO: CANDIDATE IMPLEMENTS THIS
 
+	jobID := uuid.New().String()
+    var processed, successful, failed int32
+
+    go func() {
+        ctx, cancel := context.WithTimeout(context.Background(), time.Duration(req.TimeoutSeconds)*time.Second)
+        defer cancel()
+
+        pool := queue.NewRateLimitedWorkerPool(
+            queue.WorkerPoolOptions{
+                NumWorkers: req.MaxConcurrency,
+                BufferSize: req.MaxConcurrency * 2,
+            },
+            10,
+        )
+        pool.Start()
+
+        var (
+            mu        sync.Mutex
+            batch     []*database.User
+            batchSize = 10
+        )
+
+        for _, username := range req.Usernames {
+            u := username
+            task := &queue.UserProcessingTask{
+                Username: u,
+                Processor: func(ctx context.Context, username string) error {
+                    if err := pool.WaitForRateLimit(ctx); err != nil {
+                        atomic.AddInt32(&processed, 1)
+                        atomic.AddInt32(&failed, 1)
+                        return err
+                    }
+                    user, err := external.ScrapeInstagramUser(ctx, username)
+                    atomic.AddInt32(&processed, 1)
+                    if err != nil {
+                        atomic.AddInt32(&failed, 1)
+                        log.Error().Err(err).Str("username", username).Msg("failed to scrape user")
+                        return err
+                    }
+                    mu.Lock()
+                    batch = append(batch, user)
+                    if len(batch) >= batchSize {
+                        if err := database.BatchUpsertUsers(ctx, batch); err != nil {
+                            log.Error().Err(err).Msg("failed to batch upsert users")
+                        } else {
+                            atomic.AddInt32(&successful, int32(len(batch)))
+                        }
+                        batch = batch[:0]
+                    }
+                    mu.Unlock()
+                    return nil
+                },
+            }
+            _ = pool.EnqueueTask(task)
+        }
+
+        pool.WaitForCompletion(ctx)
+        // Upsert any remaining users
+        mu.Lock()
+        if len(batch) > 0 {
+            if err := database.BatchUpsertUsers(ctx, batch); err == nil {
+                atomic.AddInt32(&successful, int32(len(batch)))
+            }
+        }
+        mu.Unlock()
+    }()
+
+    c.JSON(http.StatusOK, gin.H{
+        "job_id":           jobID,
+        "status":           "running",
+        "total_users":      len(req.Usernames),
+        "processed_users":  atomic.LoadInt32(&processed),
+        "successful_users": atomic.LoadInt32(&successful),
+        "failed_users":     atomic.LoadInt32(&failed),
+    })
+
 	// PLACEHOLDER RESPONSE - REPLACE WITH ACTUAL IMPLEMENTATION
-	c.JSON(http.StatusNotImplemented, gin.H{
-		"error": "batch processing not implemented yet",
-		"task":  "Implement parallel processing of Instagram users",
-		"requirements": []string{
-			"Process users in parallel with configurable concurrency",
-			"Respect RocketAPI rate limits (10 req/sec)",
-			"Handle individual user failures gracefully",
-			"Return detailed status for each user",
-			"Implement timeout handling",
-		},
-		"hints": map[string]interface{}{
-			"functions_to_use": []string{
-				"external.ScrapeInstagramUser(ctx, username)",
-				"database.UpsertUser(ctx, user)",
-			},
-			"patterns_to_implement": []string{
-				"Worker pool pattern",
-				"Rate limiting across workers",
-				"Error aggregation",
-				"Progress tracking",
-			},
-		},
-	})
+	// c.JSON(http.StatusNotImplemented, gin.H{
+	// 	"error": "batch processing not implemented yet",
+	// 	"task":  "Implement parallel processing of Instagram users",
+	// 	"requirements": []string{
+	// 		"Process users in parallel with configurable concurrency",
+	// 		"Respect RocketAPI rate limits (10 req/sec)",
+	// 		"Handle individual user failures gracefully",
+	// 		"Return detailed status for each user",
+	// 		"Implement timeout handling",
+	// 	},
+	// 	"hints": map[string]interface{}{
+	// 		"functions_to_use": []string{
+	// 			"external.ScrapeInstagramUser(ctx, username)",
+	// 			"database.UpsertUser(ctx, user)",
+	// 		},
+	// 		"patterns_to_implement": []string{
+	// 			"Worker pool pattern",
+	// 			"Rate limiting across workers",
+	// 			"Error aggregation",
+	// 			"Progress tracking",
+	// 		},
+	// 	},
+	// })
 }
