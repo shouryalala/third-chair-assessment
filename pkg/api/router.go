@@ -44,9 +44,9 @@ func InitRouter(config *utils.Config) *gin.Engine {
 	// 404 handler
 	r.NoRoute(func(c *gin.Context) {
 		c.JSON(404, gin.H{
-			"error":   "route not found",
-			"path":    c.Request.URL.Path,
-			"method":  c.Request.Method,
+			"error":  "route not found",
+			"path":   c.Request.URL.Path,
+			"method": c.Request.Method,
 		})
 	})
 
