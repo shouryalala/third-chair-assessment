@@ -14,8 +14,8 @@ type Config struct {
 	ServerPort     string
 	DatabaseURL    string
 	RocketAPIKey   string
-	RateLimit      int  // requests per second
-	MaxConcurrency int  // max concurrent workers
+	RateLimit      int // requests per second
+	MaxConcurrency int // max concurrent workers
 	LogLevel       string
 }
 
